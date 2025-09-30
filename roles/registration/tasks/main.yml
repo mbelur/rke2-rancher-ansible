@@ -1,0 +1,11 @@
+---
+
+- name: Registration
+  become: true
+  ansible.builtin.shell: |
+    {% if "Micro" in ansible_facts.distribution %}transactional-update register{% else %}SUSEConnect{% endif %} --url {{ registration_server | default("https://scc.suse.com") }} --email {{ registration_email }} --regcode "{{ registration_code }}"
+  register: register_result
+  when:
+  - registration_code is defined and registration_code | length > 0
+  - registration_email is defined and registration_email | length > 0
+  failed_when: "'Error' in register_result.stdout"

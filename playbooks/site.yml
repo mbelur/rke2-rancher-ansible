@@ -1,0 +1,15 @@
+- name: Pre-Check nodes are SUSE based
+  import_playbook: 00-pre-check-and-register.yml
+
+- name: Install RKE2 server
+  import_playbook: 01-install-rke2.yml
+
+- name: Install RKE2 agent
+  import_playbook: 02-install-rke2-agent.yml
+
+- name: Install kubernertes tools
+  import_playbook: 03-install-k8s-toolchain.yml
+
+- name: Install Rancher
+  import_playbook: 04-install-rancher.yml
+  when: rancher_enabled | default(False)

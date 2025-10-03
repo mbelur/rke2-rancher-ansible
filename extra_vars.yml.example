@@ -1,17 +1,19 @@
 ---
 # SLE
 registration_server: "https://scc.suse.com"
-registration_email: "" #Leave empty if nodes are already registered with SCC
-registration_code: "" #Leave empty if nodes are already registered with SCC
+registration_email: ""
+registration_code: ""
+
+# Nvidia
+nvidia:
+  driver_install: true
+  gpu_operator_deploy: true
 
 # RKE2
-# for lb_address, please check the https://docs.rke2.io/install/ha#1-configure-the-fixed-registration-address.
-# When empty, the playbooks use the IP address of the first server.
-
 rke2:
   version: v1.33.5+rke2r1
   token: suse-rke2-rancher-token
-  lb_address: ""
+  lb_address: "" #pre-configured loadbalancer. When empty, the playbooks use the IP address of the first server.
 
 # Rancher
 rancher_enabled: true

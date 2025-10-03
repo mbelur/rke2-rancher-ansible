@@ -1,0 +1,108 @@
+---
+
+# Install the nvidia driver packages on the servers that has GPU.
+
+- name: Construct cuda url
+  set_fact:
+    construct_cuda_url: >-
+      {% if ansible_distribution in ["openSUSE Leap", "openSUSE Tumbleweed"] %}
+      https://developer.download.nvidia.com/compute/cuda/repos/opensuse{{ ansible_distribution_major_version }}/{{ 'sbsa' if ansible_architecture == 'aarch64' else ansible_architecture }}/
+      {% elif ansible_os_family == "Suse" and ansible_distribution == "SLES" %}
+      https://developer.download.nvidia.com/compute/cuda/repos/sles{{ ansible_distribution_major_version }}/{{ 'sbsa' if ansible_architecture == 'aarch64' else ansible_architecture }}/
+      {% elif ansible_distribution == "SL-Micro" %}
+      {% set sle_version = '15' if ansible_distribution_major_version in ['6'] %}
+      https://developer.download.nvidia.com/compute/cuda/repos/sles{{sle_version}}/{{ 'sbsa' if ansible_architecture == 'aarch64' else ansible_architecture }}/
+      {% else %}
+      unsupported
+      {% endif %}
+
+- name: Set cuda_repo_url
+  set_fact:
+    cuda_repo_url: "{{ construct_cuda_url | trim }}"
+
+- name: Display cuda_repo_url
+  debug:
+    msg: "{{ cuda_repo_url }}"
+
+- name: Check if CUDA repo URL is reachable
+  uri:
+    url: "{{ cuda_repo_url }}"
+    method: HEAD
+    return_content: no
+    status_code: 200
+    timeout: 10
+  register: cuda_repo_check
+  failed_when: cuda_repo_check.status | default(0) != 200
+  changed_when: false
+
+- name: Fail if CUDA repo URL is not reachable
+  fail:
+    msg: "CUDA repo URL {{ cuda_repo_url }} is not reachable!"
+  when: cuda_repo_check is failed
+
+- name: Add a package repository from NVIDIA
+  become: true
+  community.general.zypper_repository:
+    name: cuda
+    repo: "{{cuda_repo_url}}"
+    state: present
+    auto_import_keys: true
+    runrefresh: true
+
+- name: Check for GPU using lspci
+  become: true
+  command: lspci
+  register: lspci_out
+
+- name: Determine if GPU is present
+  set_fact:
+    has_gpu: "{{ lspci_out.stdout is search('VGA compatible controller.*NVIDIA|3D controller.*NVIDIA', ignorecase=True) }}"
+
+- name: Check if nvidia-smi is working
+  become: true
+  ansible.builtin.shell: nvidia-smi
+  register: nvidia_smi_result
+  changed_when: false
+  failed_when: false
+  when: has_gpu | default(false)
+
+- name: Copy install-nvidia-packages.sh script
+  become: true
+  copy:
+    src: files/install-nvidia-packages.sh
+    dest: ~/install-nvidia-packages.sh
+    mode: "0755"
+
+- name: Set nvidia_pkg_install command - sles
+  set_fact:
+    nvidia_pkg_install_cmd: >-
+      bash -c "FALLBACK_DRIVER_VERSION_SLES={{ nvidia.driver_version_sles | default('575.57.08') }} ~/install-nvidia-packages.sh"
+  when: ansible_distribution == 'SLES'
+
+- name: Set nvidia_pkg_install command - sl-micro
+  set_fact:
+    nvidia_pkg_install_cmd: >-
+      transactional-update --continue run bash -c "FALLBACK_DRIVER_VERSION_SLE_MICRO={{ nvidia.driver_version_sle_micro | default('570.133.20') }} ~/install-nvidia-packages.sh"
+  when: ansible_distribution == 'SL-Micro'
+
+#  Install NVIDIA graphic drivers packages when nvidia-smi not found or nvidia.driver_install_force true
+- block:
+  - name: Install NVIDIA graphic drivers packages
+    become: true
+    command: "{{ nvidia_pkg_install_cmd }}"
+    register: version_result
+
+  - name: Check SUCCESS marker left by the installation script
+    become: true
+    shell: grep -q "SUCCESS" "/var/log/nvidia_driver_install_success.log"
+    register: grep_result
+    ignore_errors: true
+
+  - name: Fail if SUCCESS not found
+    fail:
+      msg: "The file does not contain SUCCESS!"
+    when: grep_result.rc != 0
+  notify: Reboot after update #Reboot handler in roles/common
+  when:
+    - has_gpu | default(false)
+    - ("command not found" in (nvidia_smi_result.stderr | default('')) or nvidia.driver_install_force | default(false))

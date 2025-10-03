@@ -1,6 +1,6 @@
 # RKE2 + Rancher HA Setup via Ansible
 
-This project automates the setup of a high-availability RKE2 cluster along with Rancher on SUSE-based operating systems,
+This project automates the setup of a high-availability RKE2 cluster along with Rancher on SLES, SLE-Micro,
 leveraging containerized Ansible playbooks to streamline installation.
 The initial implementation is designed to work with the default configuration options for both RKE2 and Rancher.
 
@@ -9,7 +9,7 @@ The initial implementation is designed to work with the default configuration op
 
 - Docker or Podman
 - SSH key-based access to all target nodes
-- Target hosts are suse based OS
+- Target hosts are SLES, SLE-Micro
 - Proper DNS setup (e.g. `rancher.example.com`)
 - Target hosts must fulfill prerequisites at https://docs.rke2.io/install/quickstart#prerequisites
 - Target hosts with python 3.11+ version
@@ -89,9 +89,13 @@ cp extra_vars.yml.example extra_vars.yml
 ```
 Configure entries in extra_vars.yml accordingly.
 
-### 4. Run an individual playbook
+### 4. Run the stage1 playbook
+This playbook at a high level checks that the target hosts are supported systems. Registers the
+systems with the SCC if not already registered. Install packages and nvidia drivers.
+The nvidia drivers are installed only when the servers have the NVIDIA GPU.
+Finally the playbook *reboots* the target hosts.
 
-Example: 00-pre-check-and-register playbook
+Note: This playbook does not install the nvidia drivers when localhost is the target.
 
 ```bash
 docker run --rm \
@@ -99,31 +103,32 @@ docker run --rm \
   -v ./inventory.ini:/workspace/inventory.ini \
   -v ./extra_vars.yml:/workspace/extra_vars.yml \
   rke2-rancher-ansible-runner \
-  ansible-playbook -i inventory.ini playbooks/00-pre-check-and-register.yml -e "@extra_vars.yml"
+  ansible-playbook -i inventory.ini playbooks/stage1.yml -e "@extra_vars.yml"
 ```
 
 If your target node is a *localhost*, using the host networking mode (--network host):
 
 ```bash
 docker run --rm \
-    --network host \
+  --network host \
   -v ~/.ssh/id_rsa:/root/.ssh/id_rsa:ro \
   -v ./inventory.ini:/workspace/inventory.ini \
   -v ./extra_vars.yml:/workspace/extra_vars.yml \
   rke2-rancher-ansible-runner \
-  ansible-playbook -i inventory.ini playbooks/00-pre-check-and-register.yml -e "@extra_vars.yml"
+  ansible-playbook -i inventory.ini playbooks/stage1.yml -e "@extra_vars.yml"
 ```
 
-### 5. Run full setup
+### 5. Run the stage2 playbook
 
-By default, the site.yml playbook is run which checks whether the node is SUSE based distro, registers, sets up rke2 servers, rke2 agents and rancher based on the hosts defined in inventory.ini and variables defined in extra_vars.yml.
+This playbook will run a post-stage1 check and installs rke2 servers, rke2 agents, rancher and gpu-operator.
 
 ```bash
 docker run --rm \
   -v ~/.ssh/id_rsa:/root/.ssh/id_rsa:ro \
   -v ./inventory.ini:/workspace/inventory.ini \
   -v ./extra_vars.yml:/workspace/extra_vars.yml \
-  rke2-rancher-ansible-runner
+  rke2-rancher-ansible-runner \
+  ansible-playbook -i inventory.ini playbooks/stage2.yml -e "@extra_vars.yml"
 ```
 
 If your target node is a localhost, using the host networking mode (--network host):
@@ -134,7 +139,8 @@ docker run --rm \
   -v ~/.ssh/id_rsa:/root/.ssh/id_rsa:ro \
   -v ./inventory.ini:/workspace/inventory.ini \
   -v ./extra_vars.yml:/workspace/extra_vars.yml \
-  rke2-rancher-ansible-runner
+  rke2-rancher-ansible-runner \
+  ansible-playbook -i inventory.ini playbooks/stage2.yml -e "@extra_vars.yml"
 ```
 
 ### 6. Troubleshooting

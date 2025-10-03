@@ -1,5 +1,5 @@
-- name: Pre-Check nodes are SUSE based
-  import_playbook: 00-pre-check-and-register.yml
+- name: Post stage1 check
+  import_playbook: stage1-post-check.yml
 
 - name: Install RKE2 server
   import_playbook: 01-install-rke2.yml
@@ -7,9 +7,13 @@
 - name: Install RKE2 agent
   import_playbook: 02-install-rke2-agent.yml
 
-- name: Install kubernertes tools
+- name: Install Kubernertes tools - helm, k9s
   import_playbook: 03-install-k8s-toolchain.yml
 
 - name: Install Rancher
   import_playbook: 04-install-rancher.yml
   when: rancher_enabled | default(False)
+
+- name: Install NVIDIA gpu-operator
+  import_playbook: 05-install-gpu-operator.yml
+  when: nvidia.gpu_operator_deploy | default(False)

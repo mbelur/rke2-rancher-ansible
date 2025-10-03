@@ -13,4 +13,4 @@ COPY . /workspace
 ENV ANSIBLE_FORCE_COLOR=1
 
 # Default command (can be overridden)
-CMD ["ansible-playbook", "-i", "inventory.ini", "playbooks/site.yml", "-e", "@extra_vars.yml"]
+CMD ["ansible-playbook", "-i", "inventory.ini", "playbooks/stage2.yml", "-e", "@extra_vars.yml"]

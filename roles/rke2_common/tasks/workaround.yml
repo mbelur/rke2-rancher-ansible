@@ -5,20 +5,19 @@
   ansible.builtin.setup:
 
 - name: Gather service facts
-  ansible.builtin.service_facts:
+  ansible.builtin.service_facts: {}
 
-- name: Check if firewalld package is installed
-  ansible.builtin.package_facts:
-    manager: auto
-
-- name: Stop and disable firewalld
+# https://docs.rke2.io/known_issues#firewalld-conflicts-with-default-networking
+- name: Disable firewalld if present
   ansible.builtin.systemd:
     name: firewalld
     state: stopped
     enabled: false
   when:
-    - ansible_service_mgr == "systemd"
-    - "'firewalld' in ansible_facts.packages"
+    - ansible_facts.services is defined
+    - "'firewalld.service' in ansible_facts.services"
+  ignore_errors: true
+  failed_when: false
 
 # If NetworkManager is installed and enabled on your hosts, 
 # ensure that it is configured to ignore CNI-managed interfaces.

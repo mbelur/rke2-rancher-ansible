@@ -8,7 +8,7 @@
   register: node_reboot
   listen: Reboot after update
   when:
-    - not inventory_hostname == "localhost"
+    - not ansible_host == "localhost"
 
 - name: Wait for port 22
   ansible.builtin.wait_for:
@@ -16,4 +16,4 @@
     timeout: "{{ reboot_wait_timeout | default(300) }}"
   when: 
     - node_reboot.changed or node_force_reboot.changed
-    - not inventory_hostname == 'localhost'
+    - not ansible_host == 'localhost'

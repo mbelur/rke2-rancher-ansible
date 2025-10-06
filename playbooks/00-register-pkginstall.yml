@@ -20,6 +20,7 @@
     - name: Registration
       ansible.builtin.import_role:
         name: registration
+      when: ansible_distribution == "SL-Micro" or ansible_distribution == "SLES"
     
     # Install packages
     - name: Install Packages
@@ -35,8 +36,8 @@
       ansible.builtin.import_role:
         name: nvidia-driver
       when: 
-        - not inventory_hostname == "localhost"
-        - nvidia['driver_install'] | default(false)
+        - not ansible_host == "localhost"
+        - nvidia.driver_install | default(false) | bool
 
     - name: Warning when target is a localhost for nvidia driver install
       ansible.builtin.debug:
@@ -45,4 +46,4 @@
           "Please refer to the official documentation on installing nvidia drives
           " on your localhost. After rebooting your localhost, proceed with stage2"
       when:
-        - inventory_hostname == "localhost"
+        - ansible_host == "localhost"

@@ -13,7 +13,7 @@
   shell: |
     {% if ansible_distribution == "SL-Micro" -%}
     transactional-update --continue -n pkg install --auto-agree-with-licenses {{ suse_packages | join(' ') }}
-    {% elif ansible_distribution == "SLES" -%}
+    {% else %}
     zypper --non-interactive install {{ suse_packages | join(' ') }}
     {% endif %}
   register: install_suse_packages

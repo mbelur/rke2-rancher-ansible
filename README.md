@@ -1,6 +1,6 @@
 # RKE2 + Rancher HA Setup via Ansible
 
-This project automates the setup of a high-availability RKE2 cluster along with Rancher on SLES, SLE-Micro,
+This project automates the setup of a high-availability RKE2 cluster along with Rancher on SUSE based OS,
 leveraging containerized Ansible playbooks to streamline installation.
 The initial implementation is designed to work with the default configuration options for both RKE2 and Rancher.
 
@@ -9,10 +9,10 @@ The initial implementation is designed to work with the default configuration op
 
 - Docker or Podman
 - SSH key-based access to all target nodes
-- Target hosts are SLES, SLE-Micro
+- Target hosts are SUSE based OS
 - Proper DNS setup (e.g. `rancher.example.com`)
 - Target hosts must fulfill prerequisites at https://docs.rke2.io/install/quickstart#prerequisites
-- Target hosts with python 3.11+ version
+- Target hosts with python 3.11+ version. Verify that Python 3 points to version 3.11 or higher: python3 --version
 - A valid registration key for the SUSE OS distribution, which can be obtained with your SUSE subscription.
 
 ## Components
@@ -92,7 +92,7 @@ Configure entries in extra_vars.yml accordingly.
 ### 4. Run the stage1 playbook
 This playbook at a high level checks that the target hosts are supported systems. Registers the
 systems with the SCC if not already registered. Install packages and nvidia drivers.
-The nvidia drivers are installed only when the servers have the NVIDIA GPU.
+NVIDIA G06 drivers are installed on servers with NVIDIA GPUs and are supported on Turing and later architectures.
 Finally the playbook *reboots* the target hosts.
 
 Note: This playbook does not install the nvidia drivers when localhost is the target.
@@ -106,7 +106,7 @@ docker run --rm \
   ansible-playbook -i inventory.ini playbooks/stage1.yml -e "@extra_vars.yml"
 ```
 
-If your target node is a *localhost*, using the host networking mode (--network host):
+If your target ansible_host is a *localhost*, using the host networking mode (--network host):
 
 ```bash
 docker run --rm \
@@ -131,7 +131,7 @@ docker run --rm \
   ansible-playbook -i inventory.ini playbooks/stage2.yml -e "@extra_vars.yml"
 ```
 
-If your target node is a localhost, using the host networking mode (--network host):
+If your target ansible_host is a localhost, using the host networking mode (--network host):
 
 ```bash
 docker run --rm \
@@ -152,3 +152,4 @@ confirm key permissions (~/.ssh 700, private key 600).
 verify public key is in ~/.ssh/authorized_keys of the remote user.
 
 run ssh -v user@host to debug connection/auth issues.
+

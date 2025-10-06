@@ -66,43 +66,106 @@
   failed_when: false
   when: has_gpu | default(false)
 
-- name: Copy install-nvidia-packages.sh script
-  become: true
-  copy:
-    src: files/install-nvidia-packages.sh
-    dest: ~/install-nvidia-packages.sh
-    mode: "0755"
+- name: Read os-release info
+  shell: |
+    source /etc/os-release
+    echo $ID
+  register: osid
 
-- name: Set nvidia_pkg_install command - sles
+- name: Set driver package variables
   set_fact:
-    nvidia_pkg_install_cmd: >-
-      bash -c "FALLBACK_DRIVER_VERSION_SLES={{ nvidia.driver_version_sles | default('575.57.08') }} ~/install-nvidia-packages.sh"
-  when: ansible_distribution == 'SLES'
+    package_name: "{{ 'nv-prefer-signed-open-driver' if osid.stdout == 'sles' else 'nvidia-open-driver-G06-signed-cuda-kmp-default' }}"
+    fallback_driver_version: "{{ fallback_driver_version_sles if osid.stdout == 'sles' else fallback_driver_version_sle_micro }}"
 
-- name: Set nvidia_pkg_install command - sl-micro
-  set_fact:
-    nvidia_pkg_install_cmd: >-
-      transactional-update --continue run bash -c "FALLBACK_DRIVER_VERSION_SLE_MICRO={{ nvidia.driver_version_sle_micro | default('570.133.20') }} ~/install-nvidia-packages.sh"
-  when: ansible_distribution == 'SL-Micro'
+- name: Display the package name
+  debug:
+    msg: "{{ package_name }}"
 
 #  Install NVIDIA graphic drivers packages when nvidia-smi not found or nvidia.driver_install_force true
-- block:
-  - name: Install NVIDIA graphic drivers packages
-    become: true
-    command: "{{ nvidia_pkg_install_cmd }}"
-    register: version_result
+- name: Install NVIDIA driver package (latest)
+  become: true
+  block:
+    - name: Install latest version
+      shell: >
+        {% if ansible_distribution == 'SL-Micro' %}
+        transactional-update --continue --quiet run bash -c "zypper in -y --auto-agree-with-licenses {{ package_name }}"
+        {% else %}
+        bash -c "zypper in -y --auto-agree-with-licenses {{ package_name }}"
+        {% endif %}
+      register: install_package_result
 
-  - name: Check SUCCESS marker left by the installation script
-    become: true
-    shell: grep -q "SUCCESS" "/var/log/nvidia_driver_install_success.log"
-    register: grep_result
-    ignore_errors: true
+    - name: Get installed version of package
+      shell: >
+        {% if ansible_distribution == 'SL-Micro' %}
+        transactional-update --continue --quiet run bash -c "rpm -qa --queryformat '%{VERSION}\n' {{ package_name }} | cut -d '_' -f1 | sort -u | tail -n 1"
+        {% else %}
+        bash -c "rpm -qa --queryformat '%{VERSION}\n' {{ package_name }} | cut -d '_' -f1 | sort -u | tail -n 1"
+        {% endif %}
+      register: query_result
+      failed_when: query_result.rc != 0 or query_result.stdout == ""
 
-  - name: Fail if SUCCESS not found
-    fail:
-      msg: "The file does not contain SUCCESS!"
-    when: grep_result.rc != 0
-  notify: Reboot after update #Reboot handler in roles/common
+    - name: Set latest_version
+      set_fact:
+        latest_version: "{{ query_result.stdout }}"
+
+    - name: Display latest_version
+      debug:
+        msg: "{{ package_name }} latest version is {{ latest_version }}"
+
+    - name: Check if nvidia-container-toolkit.repo exists
+      stat:
+        path: /etc/zypp/repos.d/nvidia-container-toolkit.repo
+      register: nvidia_container_toolkit_repo_file
+
+    - name: Add container toolkit repo for validation
+      shell:
+        zypper ar --refresh -G https://nvidia.github.io/libnvidia-container/stable/rpm/nvidia-container-toolkit.repo
+      when: not nvidia_container_toolkit_repo_file.stat.exists
+
+    - name: Install nvidia-container-toolkit
+      ansible.builtin.zypper:
+        name: nvidia-container-toolkit
+        disable_gpg_check: true
+        state: present
+
+    - name: Install latest package nvidia-compute-utils-G06
+      shell: >
+        {% if ansible_distribution == 'SL-Micro' %}
+        transactional-update --continue --quiet run bash -c "zypper in -y --auto-agree-with-licenses nvidia-compute-utils-G06={{ latest_version }}"
+        {% else %}
+        bash -c "zypper in -y --auto-agree-with-licenses nvidia-compute-utils-G06={{ latest_version }}"
+        {% endif %}
+      register: compute_utils_install
+
   when:
     - has_gpu | default(false)
     - ("command not found" in (nvidia_smi_result.stderr | default('')) or nvidia.driver_install_force | default(false))
+  notify: Reboot after update
+
+- name: Handle fallback if latest version install fails
+  become: true
+  block:
+    - name: Remove broken driver package
+      ansible.builtin.zypper:
+        name: "{{ package_name }}"
+        state: absent
+
+    - name: Install fallback driver version
+      ansible.builtin.zypper:
+        name: "{{ package_name }}={{ fallback_driver_version }}"
+        state: present
+        disable_gpg_check: true
+
+    - name: Install fallback compute-utils
+      ansible.builtin.zypper:
+        name: "nvidia-compute-utils-G06={{ fallback_driver_version }}"
+        state: present
+        disable_gpg_check: true
+
+  when:
+    - compute_utils_install.stdout is defined
+    - "'No provider of' in compute_utils_install.stdout"
+    - has_gpu | default(false)
+    - ("command not found" in (nvidia_smi_result.stderr | default('')) or nvidia.driver_install_force | default(false))
+  notify: Reboot after update
+

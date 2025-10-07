@@ -1,12 +1,7 @@
 ---
 
-- name: Setup
-  include_tasks: setup.yml
-
-- name: Deploy cert-manager
-  include_tasks: cert-manager.yml
-  when: cert_manager_deploy | default(True)
+# - name: Setup
+#   include_tasks: setup.yml
 
 - name: Deploy rancher
   include_tasks: rancher.yml
-      

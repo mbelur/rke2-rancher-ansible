@@ -1,9 +1,9 @@
-# RKE2 + Rancher HA Setup via Ansible
+# RKE2 Setup via Ansible
 
-This project automates the setup of a high-availability RKE2 cluster along with Rancher on SUSE based OS,
+This project automates the setup of a high-availability RKE2 cluster along with Rancher in HA on SUSE based OS,
 leveraging containerized Ansible playbooks to streamline installation.
 The initial implementation is designed to work with the default configuration options for both RKE2 and Rancher.
-
+These playbooks are intended to setup an RKE2 cluster as a base cluster to deploy SUSE AI applications.
 
 ## Prerequisites
 
@@ -18,9 +18,11 @@ The initial implementation is designed to work with the default configuration op
 ## Components
 
 - Ansible playbooks for:
+  - Optional installation of nvidia driver packages
   - RKE2 HA server installation
   - RKE2 agent node installation
-  - Rancher HA Helm deployment
+  - Optional deployment of Rancher
+  - Optional deployment of nvidia gpu-operator
 - Roles for idempotent configuration
 - A Dockerfile to run the playbooks in a container
 

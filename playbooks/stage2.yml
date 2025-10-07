@@ -10,10 +10,14 @@
 - name: Install Kubernertes tools - helm, k9s
   import_playbook: 03-install-k8s-toolchain.yml
 
+- name: Install cert-manager
+  import_playbook: 04-install-cert-manager.yml
+  when: cert_manager_deploy | default(True)
+
 - name: Install Rancher
-  import_playbook: 04-install-rancher.yml
+  import_playbook: 05-install-rancher.yml
   when: rancher_enabled | default(False)
 
 - name: Install NVIDIA gpu-operator
-  import_playbook: 05-install-gpu-operator.yml
+  import_playbook: 06-install-gpu-operator.yml
   when: nvidia.gpu_operator_deploy | default(False)

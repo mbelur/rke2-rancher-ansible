@@ -47,6 +47,10 @@
     dest: "~/.kube/config"
     remote_src: true
     mode: '0600'
+  register: copy_result
+  until: copy_result is succeeded
+  retries: 10
+  delay: 10
 
 - name: Add /usr/local/bin,/var/lib/rancher/rke2/bin and ~/bin to PATH
   lineinfile:

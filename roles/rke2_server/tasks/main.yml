@@ -33,7 +33,7 @@
     enabled: true
     state: started
   retries: 3
-  delay: 20
+  delay: 30
 
 - name: Create .kube directory
   ansible.builtin.file:
@@ -50,7 +50,7 @@
   register: copy_result
   until: copy_result is succeeded
   retries: 10
-  delay: 10
+  delay: 30
 
 - name: Add /usr/local/bin,/var/lib/rancher/rke2/bin and ~/bin to PATH
   lineinfile:

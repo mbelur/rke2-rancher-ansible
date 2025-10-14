@@ -1,5 +1,6 @@
 - name: Post stage1 check
   import_playbook: stage1-post-check.yml
+  when: not (skip_stage1_post_check | default(False))
 
 - name: Install RKE2 server
   import_playbook: 01-install-rke2.yml

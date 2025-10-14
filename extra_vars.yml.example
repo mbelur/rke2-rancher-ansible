@@ -6,8 +6,8 @@ registration_code: ""
 
 # Nvidia
 nvidia:
-  driver_install: true
-  gpu_operator_deploy: true
+  driver_install: false # Set to true if nvidia drivers need to be installed on nodes with GPU
+  gpu_operator_deploy: false # Set to true if you want to deploy nvidia gpu-operator
 
 # RKE2
 rke2:
